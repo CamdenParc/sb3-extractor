@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Scratch .sb3 to Glide Table Uploader</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+  #drop-zone { border: 2px dashed #888; padding: 30px; margin-top: 20px; cursor: pointer; }
+  pre { text-align: left; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto; background: #f8f8f8; padding: 10px; }
+</style>
+</head>
+<body>
+
+<h1>Scratch 3.0 .sb3 Extractor & Uploader</h1>
+<p>Select or drop a <strong>.sb3</strong> file to upload its <code>project.json</code> to Glide</p>
+
+<input type="file" id="fileInput" accept=".sb3" style="display:none;">
+<div id="drop-zone">Click or drop your .sb3 file here</div>
+<pre id="status"></pre>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('fileInput');
+const statusBox = document.getElementById('status');
+
+// TODO: Replace with your Glide API details
+const GLIDE_API_KEY = "YOUR_GLIDE_API_KEY";
+const TABLE_ID = "YOUR_TABLE_ID"; 
+const JSON_COLUMN_NAME = "project_json"; // Must match column name in Glide exactly
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.background = '#eef'; });
+dropZone.addEventListener('dragleave', () => dropZone.style.background = '');
+dropZone.addEventListener('drop', handleFile);
+fileInput.addEventListener('change', e => handleFile(e));
+
+function handleFile(e) {
+    e.preventDefault();
+    dropZone.style.background = '';
+    let file = e.dataTransfer ? e.dataTransfer.files[0] : e.target.files[0];
+    if (!file || !file.name.endsWith('.sb3')) {
+        alert('Please select a valid .sb3 file.');
+        return;
+    }
+    statusBox.textContent = "Reading and extracting project.json...";
+    let reader = new FileReader();
+    reader.onload = function(evt) {
+        JSZip.loadAsync(evt.target.result).then(zip => {
+            if (!zip.files['project.json']) {
+                statusBox.textContent = 'project.json not found in the .sb3 file.';
+                return;
+            }
+            zip.files['project.json'].async('string').then(jsonText => {
+                statusBox.textContent = "Uploading project.json to Glide...";
+                uploadToGlide(jsonText);
+            });
+        }).catch(err => statusBox.textContent = 'Error reading .sb3 file: ' + err);
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function uploadToGlide(jsonText) {
+    fetch(`https://api.glideapp.io/api/tables/native-table-IJ04X70BK13YD019nJ5i
+/rows`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer 3dGlQvwiwCMSQSCz4JRx`
+        },
+        body: JSON.stringify({
+            values: {
+                [JSON_COLUMN_NAME]: jsonText
+            }
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.id) {
+            statusBox.textContent = "✅ Upload complete! New row created in Glide.";
+        } else {
+            statusBox.textContent = "❌ Upload failed. Response: " + JSON.stringify(data);
+        }
+    })
+    .catch(err => {
+        statusBox.textContent = "❌ Upload failed: " + err;
+    });
+}
+</script>
+
+</bod
